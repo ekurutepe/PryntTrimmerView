@@ -88,11 +88,14 @@ public class AVAssetTimeSelector: UIView, UIScrollViewDelegate {
     }
 
     func getPosition(from time: CMTime) -> CGFloat? {
-        guard let asset = asset else {
+        guard
+            let asset = asset,
+            asset.duration.seconds > 0
+        else {
             return nil
         }
-        let timeRatio = CGFloat(time.value) * CGFloat(asset.duration.timescale) /
-            (CGFloat(time.timescale) * CGFloat(asset.duration.value))
+
+        let timeRatio = CGFloat(time.seconds / asset.duration.seconds)
         return timeRatio * durationSize
     }
 }

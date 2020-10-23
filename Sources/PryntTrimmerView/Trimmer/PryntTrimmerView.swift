@@ -304,7 +304,8 @@ public protocol TrimmerViewDelegate: class {
         }
         set {
             let position = getPosition(from: newValue ?? .zero) ?? 0.0
-            updateLeftConstraint(with: CGPoint(x: position, y: 0))
+            leftConstraint?.constant = position
+            layoutIfNeeded()
         }
     }
 
@@ -316,12 +317,13 @@ public protocol TrimmerViewDelegate: class {
         }
         set {
             if let endTime = newValue {
-                let position = getPosition(from: endTime) ?? 0.0
-                updateRightConstraint(with: CGPoint(x: position, y: 0))
+                let position = (getPosition(from: endTime) ?? 0.0) - durationSize
+                rightConstraint?.constant = position
             } else {
-                let position = durationSize
-                updateRightConstraint(with: CGPoint(x: position, y: 0))
+                rightConstraint?.constant = 0.0
             }
+
+            layoutIfNeeded()
         }
     }
 
