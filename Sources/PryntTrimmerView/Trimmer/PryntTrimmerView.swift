@@ -53,6 +53,14 @@ public protocol TrimmerViewDelegate: class {
             rightMaskView.backgroundColor = maskColor
         }
     }
+    
+    /// hide the trim handles and use the bar only for the position
+    @IBInspectable public var showTrimHandles = true {
+        didSet {
+            leftHandleKnob.isHidden = !showTrimHandles
+            rightHandleKnob.isHidden = !showTrimHandles
+        }
+    }
 
     // MARK: Interface
 
