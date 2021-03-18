@@ -100,7 +100,7 @@ public protocol TrimmerViewDelegate: class {
     private var positionConstraint: NSLayoutConstraint?
 
     public let handleWidth: CGFloat = 15
-    public let poisitionBarWidth: CGFloat = 3
+    public let positionBarWidth: CGFloat = 3
 
     /// The minimum duration allowed for the trimming. The handles won't pan further if the minimum duration is attained.
     public var minDuration: Double = 3
@@ -211,7 +211,7 @@ public protocol TrimmerViewDelegate: class {
 
     private func setupPositionBar() {
 
-        positionBar.frame = CGRect(x: 0, y: 0, width: poisitionBarWidth, height: frame.height)
+        positionBar.frame = CGRect(x: 0, y: 0, width: positionBarWidth, height: frame.height)
         positionBar.backgroundColor = positionBarColor
         positionBar.center = CGPoint(x: leftHandleView.frame.maxX, y: center.y)
         positionBar.layer.cornerRadius = 1
