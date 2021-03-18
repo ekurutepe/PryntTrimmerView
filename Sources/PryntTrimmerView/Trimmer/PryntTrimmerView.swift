@@ -20,6 +20,11 @@ public protocol TrimmerViewDelegate: class {
 /// Load the video by setting the `asset` property. Access the `startTime` and `endTime` of the view to get the selected time
 // range
 @IBDesignable public class TrimmerView: AVAssetTimeSelector {
+    
+    public enum Mode {
+        case trimming
+        case position
+    }
 
     // MARK: - Properties
 
@@ -53,6 +58,17 @@ public protocol TrimmerViewDelegate: class {
             rightMaskView.backgroundColor = maskColor
         }
     }
+    
+    /// .trimming mode is the default mode for trimming
+    /// with .position mode, the bar behaves more like a default scrub-bar
+    public var mode = Mode.trimming {
+        didSet {
+            leftHandleKnob.isHidden = mode != .trimming
+            rightHandleKnob.isHidden = mode != .trimming
+            assetPreview.isScrollEnabled = mode == .trimming
+            updateGestureRecognizers()
+        }
+    }
 
     // MARK: Interface
 
@@ -68,6 +84,12 @@ public protocol TrimmerViewDelegate: class {
     private let rightHandleKnob = UIView()
     private let leftMaskView = UIView()
     private let rightMaskView = UIView()
+    
+    // MARK: GestureRecognizers
+    
+    private var positionTapGestureRecognizer: UITapGestureRecognizer?
+    private var leftPanGestureRecognizer: UIPanGestureRecognizer?
+    private var rightPanGestureRecognizer: UIPanGestureRecognizer?
 
     // MARK: Constraints
 
@@ -77,7 +99,8 @@ public protocol TrimmerViewDelegate: class {
     private var rightConstraint: NSLayoutConstraint?
     private var positionConstraint: NSLayoutConstraint?
 
-    private let handleWidth: CGFloat = 15
+    public let handleWidth: CGFloat = 15
+    public let positionBarWidth: CGFloat = 3
 
     /// The minimum duration allowed for the trimming. The handles won't pan further if the minimum duration is attained.
     public var minDuration: Double = 3
@@ -97,6 +120,7 @@ public protocol TrimmerViewDelegate: class {
         setupGestures()
         updateMainColor()
         updateHandleColor()
+        updateGestureRecognizers()
     }
 
     override func constrainAssetPreview() {
@@ -187,7 +211,7 @@ public protocol TrimmerViewDelegate: class {
 
     private func setupPositionBar() {
 
-        positionBar.frame = CGRect(x: 0, y: 0, width: 3, height: frame.height)
+        positionBar.frame = CGRect(x: 0, y: 0, width: positionBarWidth, height: frame.height)
         positionBar.backgroundColor = positionBarColor
         positionBar.center = CGPoint(x: leftHandleView.frame.maxX, y: center.y)
         positionBar.layer.cornerRadius = 1
@@ -201,15 +225,19 @@ public protocol TrimmerViewDelegate: class {
         positionConstraint = positionBar.leftAnchor.constraint(equalTo: leftHandleView.rightAnchor, constant: 0)
         positionConstraint?.isActive = true
     }
-
+    
     private func setupGestures() {
-
+        let tapGestureRecognizer = UITapGestureRecognizer(target: self, action: #selector(TrimmerView.handleTap))
+        self.addGestureRecognizer(tapGestureRecognizer)
+        self.positionTapGestureRecognizer = tapGestureRecognizer
         let leftPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(TrimmerView.handlePanGesture))
         leftHandleView.addGestureRecognizer(leftPanGestureRecognizer)
+        self.leftPanGestureRecognizer = leftPanGestureRecognizer
         let rightPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(TrimmerView.handlePanGesture))
         rightHandleView.addGestureRecognizer(rightPanGestureRecognizer)
+        self.rightPanGestureRecognizer = rightPanGestureRecognizer
     }
-
+    
     private func updateMainColor() {
         trimView.layer.borderColor = mainColor.cgColor
         leftHandleView.backgroundColor = mainColor
@@ -219,6 +247,12 @@ public protocol TrimmerViewDelegate: class {
     private func updateHandleColor() {
         leftHandleKnob.backgroundColor = handleColor
         rightHandleKnob.backgroundColor = handleColor
+    }
+    
+    private func updateGestureRecognizers() {
+        positionTapGestureRecognizer?.isEnabled = mode == .position
+        leftPanGestureRecognizer?.isEnabled = mode == .trimming
+        rightPanGestureRecognizer?.isEnabled = mode == .trimming
     }
 
     // MARK: - Trim Gestures
@@ -255,7 +289,20 @@ public protocol TrimmerViewDelegate: class {
         default: break
         }
     }
-
+    
+    @objc private func handleTap(_ gestureRecognizer: UIPanGestureRecognizer) {
+        guard let view = gestureRecognizer.view else { return }
+        
+        let position = gestureRecognizer.location(in: view)        
+        let ratio = Float64(position.x / view.bounds.width)
+        if let startTime = startTime, let endTime = endTime {
+            let duration = endTime - startTime
+            let position = CMTimeMultiplyByFloat64(duration, multiplier: ratio) + startTime
+            seek(to: position)
+        }
+        updateSelectedTime(stoppedMoving: true)
+    }
+    
     private func updateLeftConstraint(with translation: CGPoint) {
         let maxConstraint = max(rightHandleView.frame.origin.x - handleWidth - minimumDistanceBetweenHandle, 0)
         let newConstraint = min(max(0, currentLeftConstraint + translation.x), maxConstraint)
@@ -286,7 +333,6 @@ public protocol TrimmerViewDelegate: class {
     /// Move the position bar to the given time.
     public func seek(to time: CMTime) {
         if let newPosition = getPosition(from: time) {
-
             let offsetPosition = newPosition - assetPreview.contentOffset.x - leftHandleView.frame.origin.x
             let maxPosition = rightHandleView.frame.origin.x - (leftHandleView.frame.origin.x + handleWidth)
                               - positionBar.frame.width
