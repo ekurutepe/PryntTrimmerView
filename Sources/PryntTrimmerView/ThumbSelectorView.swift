@@ -48,7 +48,7 @@ public class ThumbSelectorView: AVAssetTimeSelector {
 
         dimmingView.translatesAutoresizingMaskIntoConstraints = false
         dimmingView.isUserInteractionEnabled = false
-        dimmingView.backgroundColor = UIColor.black.withAlphaComponent(0.5)
+        dimmingView.backgroundColor = UIColor.white.withAlphaComponent(0.7)
         addSubview(dimmingView)
         dimmingView.leftAnchor.constraint(equalTo: leftAnchor).isActive = true
         dimmingView.rightAnchor.constraint(equalTo: rightAnchor).isActive = true
@@ -89,7 +89,7 @@ public class ThumbSelectorView: AVAssetTimeSelector {
         case .changed:
 
             let translation = gestureRecognizer.translation(in: superView)
-            updateThumbConstraint(with: translation.x)
+            updateThumbConstraint(with: translation)
             layoutIfNeeded()
             updateSelectedTime()
 
@@ -99,9 +99,9 @@ public class ThumbSelectorView: AVAssetTimeSelector {
         }
     }
 
-    private func updateThumbConstraint(with xTranslation: CGFloat) {
+    private func updateThumbConstraint(with translation: CGPoint) {
         let maxConstraint = frame.width - thumbView.frame.width
-        let newConstraint = min(max(0, currentThumbConstraint + xTranslation), maxConstraint)
+        let newConstraint = min(max(0, currentThumbConstraint + translation.x), maxConstraint)
         leftThumbConstraint?.constant = newConstraint
     }
 
@@ -159,18 +159,8 @@ public class ThumbSelectorView: AVAssetTimeSelector {
 
     /// The currently selected time of the asset.
     public var selectedTime: CMTime? {
-        get {
-            let thumbPosition = thumbView.center.x + assetPreview.contentOffset.x - (thumbView.frame.width / 2)
-            return getTime(from: thumbPosition)
-        }
-        set {
-            guard
-                let time = newValue,
-                let thumbPosition = getPosition(from: time)
-            else { return }
-
-            updateThumbConstraint(with: thumbPosition)
-        }
+        let thumbPosition = thumbView.center.x + assetPreview.contentOffset.x - (thumbView.frame.width / 2)
+        return getTime(from: thumbPosition)
     }
 
     private func updateSelectedTime() {
