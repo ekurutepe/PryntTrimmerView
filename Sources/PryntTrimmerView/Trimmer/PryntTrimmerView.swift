@@ -63,8 +63,10 @@ public protocol TrimmerViewDelegate: class {
     /// with .position mode, the bar behaves more like a default scrub-bar
     public var mode = Mode.trimming {
         didSet {
-            leftHandleKnob.isHidden = mode != .trimming
-            rightHandleKnob.isHidden = mode != .trimming
+            leftHandleView.isHidden = mode != .trimming
+            rightHandleView.isHidden = mode != .trimming
+            leftHandleWidthConstraint?.constant = (mode == .trimming) ? handleWidth : 0.0
+            rightHandleWidthConstraint?.constant = (mode == .trimming) ? handleWidth : 0.0
             assetPreview.isScrollEnabled = mode == .trimming
             updateGestureRecognizers()
         }
@@ -90,6 +92,7 @@ public protocol TrimmerViewDelegate: class {
     private var positionTapGestureRecognizer: UITapGestureRecognizer?
     private var leftPanGestureRecognizer: UIPanGestureRecognizer?
     private var rightPanGestureRecognizer: UIPanGestureRecognizer?
+    private var positionPanGestureRecognizer: UIPanGestureRecognizer?
 
     // MARK: Constraints
 
@@ -98,6 +101,9 @@ public protocol TrimmerViewDelegate: class {
     private var leftConstraint: NSLayoutConstraint?
     private var rightConstraint: NSLayoutConstraint?
     private var positionConstraint: NSLayoutConstraint?
+    private var leftHandleWidthConstraint: NSLayoutConstraint?
+    private var rightHandleWidthConstraint: NSLayoutConstraint?
+
 
     public let handleWidth: CGFloat = 15
     public let positionBarWidth: CGFloat = 3
@@ -153,7 +159,8 @@ public protocol TrimmerViewDelegate: class {
         addSubview(leftHandleView)
 
         leftHandleView.heightAnchor.constraint(equalTo: heightAnchor).isActive = true
-        leftHandleView.widthAnchor.constraint(equalToConstant: handleWidth).isActive = true
+        leftHandleWidthConstraint = leftHandleView.widthAnchor.constraint(equalToConstant: handleWidth)
+        leftHandleWidthConstraint?.isActive = true
         leftHandleView.leftAnchor.constraint(equalTo: trimView.leftAnchor).isActive = true
         leftHandleView.centerYAnchor.constraint(equalTo: centerYAnchor).isActive = true
 
@@ -171,7 +178,8 @@ public protocol TrimmerViewDelegate: class {
         addSubview(rightHandleView)
 
         rightHandleView.heightAnchor.constraint(equalTo: heightAnchor).isActive = true
-        rightHandleView.widthAnchor.constraint(equalToConstant: handleWidth).isActive = true
+        rightHandleWidthConstraint = rightHandleView.widthAnchor.constraint(equalToConstant: handleWidth)
+        rightHandleWidthConstraint?.isActive = true
         rightHandleView.rightAnchor.constraint(equalTo: trimView.rightAnchor).isActive = true
         rightHandleView.centerYAnchor.constraint(equalTo: centerYAnchor).isActive = true
 
@@ -236,6 +244,11 @@ public protocol TrimmerViewDelegate: class {
         let rightPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(TrimmerView.handlePanGesture))
         rightHandleView.addGestureRecognizer(rightPanGestureRecognizer)
         self.rightPanGestureRecognizer = rightPanGestureRecognizer
+
+        let positionPanGestureRecognizer = UIPanGestureRecognizer(target: self, action: #selector(TrimmerView.handlePanGesture))
+        assetPreview.addGestureRecognizer(positionPanGestureRecognizer)
+        self.positionPanGestureRecognizer = positionPanGestureRecognizer
+
     }
     
     private func updateMainColor() {
@@ -250,6 +263,7 @@ public protocol TrimmerViewDelegate: class {
     }
     
     private func updateGestureRecognizers() {
+        positionPanGestureRecognizer?.isEnabled = true
         positionTapGestureRecognizer?.isEnabled = mode == .position
         leftPanGestureRecognizer?.isEnabled = mode == .trimming
         rightPanGestureRecognizer?.isEnabled = mode == .trimming
@@ -259,9 +273,15 @@ public protocol TrimmerViewDelegate: class {
 
     @objc func handlePanGesture(_ gestureRecognizer: UIPanGestureRecognizer) {
         guard let view = gestureRecognizer.view, let superView = gestureRecognizer.view?.superview else { return }
-        let isLeftGesture = view == leftHandleView
-        switch gestureRecognizer.state {
 
+        if gestureRecognizer == positionPanGestureRecognizer {
+            handlePositionPan(gestureRecognizer)
+            return
+        }
+
+        let isLeftGesture = view == leftHandleView
+
+        switch gestureRecognizer.state {
         case .began:
             if isLeftGesture {
                 currentLeftConstraint = leftConstraint!.constant
@@ -289,6 +309,27 @@ public protocol TrimmerViewDelegate: class {
         default: break
         }
     }
+
+    private func handlePositionPan(_ pan: UIPanGestureRecognizer) {
+        guard let view = pan.view else { return }
+
+        let position = pan.location(in: view)
+        let ratio = Float64(position.x / view.bounds.width)
+        if let startTime = startTime, let endTime = endTime {
+            let duration = endTime - startTime
+            let position = CMTimeMultiplyByFloat64(duration, multiplier: ratio) + startTime
+            seek(to: position)
+        }
+        switch pan.state {
+        case .changed:
+            updateSelectedTime(stoppedMoving: false)
+        case .ended:
+            updateSelectedTime(stoppedMoving: true)
+        default:
+            break
+        }
+    }
+
     
     @objc private func handleTap(_ gestureRecognizer: UIPanGestureRecognizer) {
         guard let view = gestureRecognizer.view else { return }
